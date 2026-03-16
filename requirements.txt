@@ -1,0 +1,4 @@
+slack-sdk>=3.27
+google-api-python-client>=2.130
+google-auth>=2.29
+requests>=2.31

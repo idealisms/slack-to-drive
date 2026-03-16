@@ -1,0 +1,112 @@
+SETUP GUIDE — slack-to-drive
+============================
+
+
+1. SLACK APP
+------------
+a. Go to https://api.slack.com/apps → Create New App → From scratch
+b. Under OAuth & Permissions → Bot Token Scopes, add:
+     - channels:history   (public channels)
+     - groups:history     (private channels)
+     - files:read
+     - channels:read
+c. Click "Install to Workspace" → copy the Bot User OAuth Token (starts with xoxb-)
+d. In Slack, invite the bot to the channel: /invite @your-bot-name
+e. Right-click the channel name → Copy channel ID (starts with C or G)
+   → this is your SLACK_CHANNEL_ID
+
+
+2. GOOGLE DRIVE SERVICE ACCOUNT
+--------------------------------
+a. Go to https://console.cloud.google.com
+b. IAM & Admin → Service Accounts → Create Service Account
+   (no project-level roles needed)
+c. Once created, click the account → Keys → Add Key → JSON
+   Download and save as service_account.json
+d. Enable the Google Drive API for your project:
+   APIs & Services → Library → search "Google Drive API" → Enable
+e. In Google Drive, open your archive folder
+   → Share it with the service account's email address
+     (looks like name@project-id.iam.gserviceaccount.com)
+   → Give it Editor access
+f. Copy the folder ID from the URL:
+   https://drive.google.com/drive/folders/THIS_PART_IS_THE_FOLDER_ID
+   → this is your GOOGLE_DRIVE_FOLDER_ID
+
+
+3. GMAIL APP PASSWORD
+----------------------
+a. The sending Gmail account must have 2-Step Verification enabled
+b. Go to https://myaccount.google.com/apppasswords
+c. Create a new app password, name it "slack-to-drive"
+d. Copy the 16-character password (spaces don't matter)
+   → this is your GMAIL_APP_PASSWORD
+
+
+4. DEPLOY TO GCE VM
+--------------------
+a. Copy files to the VM (or clone from your repo):
+
+     scp -r /path/to/slack-to-drive user@your-vm-ip:~/slack-to-drive
+
+b. SSH into the VM and install pip and dependencies:
+
+     cd ~/slack-to-drive
+     curl https://bootstrap.pypa.io/pip/3.7/get-pip.py -o get-pip.py
+     python3 get-pip.py --user
+     python3 -m pip install -r requirements.txt
+
+   Note: this is for Debian 10 (Python 3.7). On newer systems, use:
+     sudo apt install -y python3-pip && pip3 install -r requirements.txt
+
+c. Copy and fill in the environment file:
+
+     cp .env.example .env
+     nano .env   # fill in all values
+
+d. Place service_account.json in the same directory (or update
+   GOOGLE_SERVICE_ACCOUNT_FILE in .env to its full path)
+
+e. Test a manual run:
+
+     set -a && source .env && set +a
+     python3 main.py
+
+   Check your email and the log file for results.
+   On the first run it will look back INITIAL_LOOKBACK_DAYS (default 30).
+
+
+5. CRON JOB
+-----------
+Run: crontab -e
+
+Add this line (runs daily at 7:00 AM UTC — adjust to taste):
+
+    0 7 * * * cd /home/youruser/slack-to-drive && set -a && . .env && set +a && python3 main.py
+
+Verify it's registered:
+
+    crontab -l
+
+
+6. LOG FILES
+------------
+Logs rotate nightly and are kept for 30 days.
+Location is set by LOG_FILE in .env (default: slack-to-drive.log
+in the working directory).
+
+To watch logs live during a manual run:
+
+    tail -f slack-to-drive.log
+
+
+7. EMAIL SUMMARY FORMAT
+------------------------
+Each run sends an email to EMAIL_TO (default: admin@rockymountaincoop.com).
+
+Subject examples:
+  [slack-to-drive] OK — 12 uploaded, 0 errors (2026-03-16 07:00 UTC)
+  [slack-to-drive] ERROR — 3 uploaded, 2 errors (2026-03-16 07:00 UTC)
+  [slack-to-drive] FAILED — unhandled exception (2026-03-16 07:00 UTC)
+
+Body includes a list of uploaded filenames and full error details if any.

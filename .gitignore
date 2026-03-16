@@ -1,0 +1,17 @@
+# Secrets and credentials
+.env
+service_account.json
+*.json
+
+# Runtime state
+state.json
+get-pip.py
+
+# Logs
+*.log
+*.log.*
+
+# Python
+__pycache__/
+*.pyc
+.venv/

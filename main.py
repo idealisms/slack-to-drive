@@ -123,10 +123,13 @@ def get_drive_service():
     return build("drive", "v3", credentials=creds)
 
 
-def hash_exists_in_drive(drive_service, md5: str, folder_id: str) -> bool:
-    q = f"md5Checksum='{md5}' and '{folder_id}' in parents and trashed=false"
-    result = drive_service.files().list(q=q, fields="files(id)", supportsAllDrives=True, includeItemsFromAllDrives=True).execute()
-    return len(result.get("files", [])) > 0
+def hash_exists_in_drive(drive_service, md5: str, filename: str, folder_id: str) -> bool:
+    q = f"name='{filename}' and '{folder_id}' in parents and trashed=false"
+    result = drive_service.files().list(
+        q=q, fields="files(id,md5Checksum)",
+        supportsAllDrives=True, includeItemsFromAllDrives=True,
+    ).execute()
+    return any(f.get("md5Checksum") == md5 for f in result.get("files", []))
 
 
 def upload_to_drive(drive_service, content: bytes, filename: str, mimetype: str, folder_id: str) -> dict:
@@ -219,7 +222,7 @@ def sync() -> tuple[int, int, int, list[str]]:
 
                 # Check for duplicate by content hash
                 md5 = hashlib.md5(dl.content).hexdigest()
-                if hash_exists_in_drive(drive, md5, GOOGLE_DRIVE_FOLDER_ID):
+                if hash_exists_in_drive(drive, md5, filename, GOOGLE_DRIVE_FOLDER_ID):
                     log.info("Already in Drive (hash match), skipping: %s", filename)
                     uploaded_ids.add(file_id)
                     skipped += 1
